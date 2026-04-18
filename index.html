@@ -336,44 +336,45 @@ body { overflow-x: hidden; }
   text-transform: uppercase; color: var(--accent);
 }
 
-.coach-goal-note {
-  padding: 10px 12px; border-radius: 8px; margin-bottom: 14px;
-  font-size: 11px; line-height: 1.5; font-weight: 500;
-}
-.coach-goal-note.cut { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.15); color: rgba(239,68,68,0.9); }
-.coach-goal-note.maintain { background: rgba(234,179,8,0.08); border: 1px solid rgba(234,179,8,0.15); color: rgba(234,179,8,0.9); }
-.coach-goal-note.bulk { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.15); color: rgba(34,197,94,0.9); }
-
 .coach-warmup {
   padding: 10px 12px; border-radius: 8px; margin-bottom: 14px;
   background: rgba(168,85,247,0.06); border: 1px solid rgba(168,85,247,0.15);
-  font-size: 11px; line-height: 1.6; color: var(--text-muted);
+  font-size: 11px; line-height: 1.5; color: var(--text-muted);
 }
 .coach-warmup strong { color: var(--purple); font-weight: 700; }
-.coach-warmup .warmup-weight { color: var(--text); font-weight: 600; }
+.coach-warmup .wu { color: var(--text); font-weight: 600; }
 
-.coach-item {
-  padding: 8px 0; border-bottom: 1px solid var(--border-soft);
-  font-size: 13px; line-height: 1.45; color: var(--text);
-}
-.coach-item:last-child { border-bottom: none; padding-bottom: 0; }
-.coach-exercise { font-weight: 600; display: flex; align-items: center; gap: 6px; }
-.coach-rec { color: var(--text-muted); font-size: 12px; margin-top: 3px; line-height: 1.5; }
-.coach-highlight { color: var(--green); font-weight: 600; }
-.coach-warn { color: var(--yellow); font-weight: 600; }
-.coach-accent { color: var(--accent); font-weight: 600; }
 .coach-empty {
   font-size: 12px; color: var(--text-muted); padding: 8px 0; line-height: 1.5;
 }
 
-.coach-set-plan {
-  display: grid; grid-template-columns: auto 1fr 1fr; gap: 4px 10px;
-  margin-top: 6px; font-size: 11px; padding: 6px 8px;
+.coach-ex-row {
+  padding: 10px 0; border-bottom: 1px solid var(--border-soft);
+}
+.coach-ex-row:last-child { border-bottom: none; padding-bottom: 0; }
+.coach-ex-top {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px;
+}
+.coach-ex-name { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.coach-directive {
+  padding: 3px 8px; border-radius: 6px; font-size: 9px; font-weight: 800;
+  letter-spacing: 0.08em; text-transform: uppercase; flex-shrink: 0;
+}
+.coach-directive.hold { background: rgba(234,179,8,0.12); color: var(--yellow); }
+.coach-directive.up { background: rgba(34,197,94,0.12); color: var(--green); }
+.coach-directive.drop { background: rgba(239,68,68,0.12); color: var(--red); }
+.coach-directive.new-ex { background: rgba(255,255,255,0.06); color: var(--text-muted); }
+
+.coach-plan {
+  display: grid; grid-template-columns: 44px 1fr 1fr; gap: 2px 8px;
+  font-size: 12px; padding: 8px 10px;
   background: rgba(255,255,255,0.02); border-radius: 6px;
 }
-.coach-set-plan .csp-label { color: var(--text-muted); font-weight: 600; }
-.coach-set-plan .csp-kg { color: var(--text); font-weight: 600; }
-.coach-set-plan .csp-reps { color: var(--text-muted); font-weight: 500; }
+.coach-plan .cp-set { color: var(--text-muted); font-weight: 700; font-size: 11px; padding: 3px 0; }
+.coach-plan .cp-set.heavy { color: var(--accent); }
+.coach-plan .cp-kg { color: var(--text); font-weight: 600; padding: 3px 0; }
+.coach-plan .cp-reps { color: var(--text-muted); font-weight: 500; text-align: right; padding: 3px 0; }
 
 /* ── Animations ────────────────────────────────────────────────── */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -1104,267 +1105,204 @@ function renderChart() {
 }
 
 // ── Coach (Greek God 2.0 RPT Logic) ─────────────────────────────────────
+// Returns { nextKg, directive, plan[] } for an RPT exercise
+function getRptPrescription(split, ex) {
+  const goal = currentGoal;
+  const [s1min, s1max] = ex.targets[0].split('-').map(Number);
+  const isLeg = split === 'leg';
+  const increment = isLeg ? 5 : 2.5;
+
+  // Find most recent Set 1 data (this week or previous)
+  let baseKg = 0, baseReps = 0, sourceWeek = 0;
+  for (let w = currentWeek; w >= 1; w--) {
+    const sv = getSet(split, ex.name, w, 1);
+    const kg = parseFloat(sv.kg) || 0;
+    if (kg > 0) { baseKg = kg; baseReps = parseFloat(sv.reps) || 0; sourceWeek = w; break; }
+  }
+  if (!baseKg) return null;
+
+  // Check if previous week ALSO hit top of range
+  let prevHitTop = false;
+  if (sourceWeek > 1) {
+    const ps = getSet(split, ex.name, sourceWeek - 1, 1);
+    prevHitTop = (parseFloat(ps.reps) || 0) >= s1max && (parseFloat(ps.kg) || 0) > 0;
+  }
+
+  // Decide next session weight + directive
+  let nextKg = baseKg, directive = 'hold';
+
+  if (baseReps >= s1max) {
+    // Hit top of range
+    if (goal === 'bulk') {
+      nextKg = baseKg + increment; directive = 'up';
+    } else if (goal === 'maintain' && prevHitTop) {
+      nextKg = baseKg + increment; directive = 'up';
+    } else {
+      directive = 'hold'; // cut always holds; maintain holds first time
+    }
+  } else if (baseReps >= s1min) {
+    directive = 'hold';
+  } else {
+    // Below range
+    if (goal === 'cut' || (baseReps < s1min && sourceWeek > 1)) {
+      // Check if below range 2 weeks running
+      const ps = getSet(split, ex.name, sourceWeek - 1, 1);
+      const prevBelow = (parseFloat(ps.reps) || 99) < s1min;
+      if (prevBelow && goal !== 'bulk') {
+        nextKg = baseKg - increment; directive = 'drop';
+      }
+    }
+  }
+
+  // Build per-set plan
+  const plan = [];
+  for (let s = 1; s <= ex.sets; s++) {
+    plan.push({ set: s, kg: rptDropWeight(nextKg, s - 1), reps: ex.targets[s - 1] });
+  }
+
+  return { nextKg, directive, plan, baseKg, baseReps };
+}
+
+// Returns { nextKg, directive, reps } for a Kino exercise
+function getKinoPrescription(split, ex) {
+  const goal = currentGoal;
+  const [minRep, maxRep] = ex.targets[0].split('-').map(Number);
+  const isLeg = split === 'leg';
+  const increment = isLeg ? 5 : 2.5;
+
+  // Find most recent data
+  let kgUsed = 0, lowestReps = Infinity, filledSets = 0, sourceWeek = 0;
+
+  for (let w = currentWeek; w >= 1; w--) {
+    let wKg = 0, wMin = Infinity, wFilled = 0;
+    for (let s = 1; s <= ex.sets; s++) {
+      const sv = getSet(split, ex.name, w, s);
+      const kg = parseFloat(sv.kg) || 0;
+      const reps = parseFloat(sv.reps) || 0;
+      if (kg > 0 && reps > 0) { wKg = Math.max(wKg, kg); wMin = Math.min(wMin, reps); wFilled++; }
+    }
+    if (wFilled > 0) { kgUsed = wKg; lowestReps = wMin; filledSets = wFilled; sourceWeek = w; break; }
+  }
+  if (!kgUsed) return null;
+
+  const allHitTop = lowestReps >= maxRep && filledSets === ex.sets;
+
+  let nextKg = kgUsed, directive = 'hold';
+
+  if (allHitTop) {
+    if (goal === 'bulk') {
+      nextKg = kgUsed + increment; directive = 'up';
+    } else if (goal === 'maintain') {
+      // Check previous week
+      let prevAllHit = sourceWeek > 1;
+      if (prevAllHit) {
+        for (let s = 1; s <= ex.sets; s++) {
+          const pv = getSet(split, ex.name, sourceWeek - 1, s);
+          if ((parseFloat(pv.reps) || 0) < maxRep) { prevAllHit = false; break; }
+        }
+      }
+      if (prevAllHit) { nextKg = kgUsed + increment; directive = 'up'; }
+    }
+    // cut: hold
+  } else if (lowestReps < minRep && goal !== 'bulk') {
+    // Check if below range 2 weeks
+    if (sourceWeek > 1) {
+      let prevBelow = false;
+      for (let s = 1; s <= ex.sets; s++) {
+        const pv = getSet(split, ex.name, sourceWeek - 1, s);
+        if ((parseFloat(pv.reps) || 0) < minRep) { prevBelow = true; break; }
+      }
+      if (prevBelow) { nextKg = kgUsed - increment; directive = 'drop'; }
+    }
+  }
+
+  return { nextKg, directive, reps: ex.targets[0], sets: ex.sets };
+}
+
 function renderCoach() {
   const box = document.getElementById('coachBox');
   if (currentTab === 'nutrition' || currentTab === 'garmin') { box.innerHTML = ''; return; }
 
   const split = currentTab;
   const exercises = EXERCISES[split];
-  const goal = currentGoal;
-  let recs = [];
+  let rows = [];
   let warmupHtml = '';
+  let hasAnyData = false;
 
-  // Find the first RPT exercise with data for warmup guidance
-  let firstRptEx = null;
   for (const ex of exercises) {
-    if (ex.method === 'rpt') { firstRptEx = ex; break; }
-  }
-
-  for (let ei = 0; ei < exercises.length; ei++) {
-    const ex = exercises[ei];
-
     if (ex.method === 'rpt') {
-      // ── RPT LOGIC ─────────────────────────────────────────
-      // Progression is based on Set 1 (heavy set)
-      const set1 = getSet(split, ex.name, currentWeek, 1);
-      const s1kg = parseFloat(set1.kg) || 0;
-      const s1reps = parseFloat(set1.reps) || 0;
-      const [s1min, s1max] = ex.targets[0].split('-').map(Number);
+      const rx = getRptPrescription(split, ex);
+      if (!rx) continue;
+      hasAnyData = true;
 
-      const isLeg = split === 'leg';
-      const increment = isLeg ? 5 : 2.5;
-
-      if (s1kg === 0) {
-        // No data this week — find most recent Set 1 data
-        let prevKg = 0, prevReps = 0;
-        for (let w = currentWeek - 1; w >= 1; w--) {
-          const pv = getSet(split, ex.name, w, 1);
-          if (parseFloat(pv.kg) > 0) { prevKg = parseFloat(pv.kg); prevReps = parseFloat(pv.reps) || 0; break; }
-        }
-        if (prevKg > 0) {
-          // Build set plan from previous data
-          let setPlan = '';
-          for (let s = 1; s <= ex.sets; s++) {
-            const tKg = rptDropWeight(prevKg, s - 1);
-            const tRange = ex.targets[s - 1];
-            setPlan += `<span class="csp-label">S${s}${s===1?' ⚡':''}</span><span class="csp-kg">${tKg} kg</span><span class="csp-reps">${tRange} reps</span>`;
-          }
-          recs.push({
-            name: ex.name, method: 'RPT',
-            rec: `Match last session — heavy set at <span class="coach-accent">${prevKg} kg</span>.`,
-            setPlan: setPlan
-          });
-
-          // Warmup for first RPT exercise
-          if (ex === firstRptEx && !warmupHtml) {
-            const w60 = Math.round(prevKg * 0.6 * 2) / 2;
-            const w75 = Math.round(prevKg * 0.75 * 2) / 2;
-            const w90 = Math.round(prevKg * 0.9 * 2) / 2;
-            warmupHtml = `
-              <div class="coach-warmup">
-                <strong>Warmup — ${ex.name}</strong><br>
-                <span class="warmup-weight">${w60} kg</span> x 5 reps (60%) &rarr;
-                <span class="warmup-weight">${w75} kg</span> x 3 reps (75%) &rarr;
-                <span class="warmup-weight">${w90} kg</span> x 1 rep (90%)<br>
-                Rest 3 min, then begin heavy set
-              </div>`;
-          }
-        }
-        continue;
+      // Warmup for first RPT exercise only
+      if (!warmupHtml) {
+        const wkg = rx.plan[0].kg;
+        const w60 = Math.round(wkg * 0.6 * 2) / 2;
+        const w75 = Math.round(wkg * 0.75 * 2) / 2;
+        const w90 = Math.round(wkg * 0.9 * 2) / 2;
+        warmupHtml = `<div class="coach-warmup"><strong>Warmup</strong> &nbsp; <span class="wu">${w60}</span> x5 &rarr; <span class="wu">${w75}</span> x3 &rarr; <span class="wu">${w90}</span> x1 &rarr; rest 3 min</div>`;
       }
 
-      // Warmup for first RPT exercise (with current data)
-      if (ex === firstRptEx && !warmupHtml) {
-        const w60 = Math.round(s1kg * 0.6 * 2) / 2;
-        const w75 = Math.round(s1kg * 0.75 * 2) / 2;
-        const w90 = Math.round(s1kg * 0.9 * 2) / 2;
-        warmupHtml = `
-          <div class="coach-warmup">
-            <strong>Warmup — ${ex.name}</strong><br>
-            <span class="warmup-weight">${w60} kg</span> x 5 reps (60%) &rarr;
-            <span class="warmup-weight">${w75} kg</span> x 3 reps (75%) &rarr;
-            <span class="warmup-weight">${w90} kg</span> x 1 rep (90%)<br>
-            Rest 3 min, then begin heavy set
-          </div>`;
+      // Build set plan grid
+      let planHtml = '<div class="coach-plan">';
+      for (const p of rx.plan) {
+        planHtml += `<div class="cp-set ${p.set === 1 ? 'heavy' : ''}">S${p.set}${p.set === 1 ? ' ⚡' : ''}</div><div class="cp-kg">${p.kg} kg</div><div class="cp-reps">${p.reps} reps</div>`;
       }
+      planHtml += '</div>';
 
-      // Check previous week's Set 1 performance
-      let prevS1Kg = 0, prevS1Reps = 0;
-      if (currentWeek > 1) {
-        const ps1 = getSet(split, ex.name, currentWeek - 1, 1);
-        prevS1Kg = parseFloat(ps1.kg) || 0;
-        prevS1Reps = parseFloat(ps1.reps) || 0;
-      }
-      const prevHitTop = prevS1Reps >= s1max && prevS1Kg > 0;
+      const dirLabel = { hold: 'HOLD', up: `UP → ${rx.nextKg}`, drop: `DROP → ${rx.nextKg}` }[rx.directive];
 
-      let rec = '', nextKg = s1kg;
-
-      if (s1reps >= s1max) {
-        // HIT TOP OF RANGE on heavy set
-        if (goal === 'cut') {
-          // Conservative on a cut — maintain strength
-          if (prevHitTop) {
-            rec = `Hit ${s1reps} reps at ${s1kg} kg two weeks running. On a cut, you're <span class="coach-highlight">crushing it</span>. Repeat <span class="coach-accent">${s1kg} kg</span> — only go up if it feels easy.`;
-          } else {
-            rec = `Hit top of range (${s1reps} reps) — excellent strength retention on a cut. Repeat <span class="coach-accent">${s1kg} kg</span> next session.`;
-          }
-        } else if (goal === 'bulk') {
-          // Aggressive — increase immediately
-          nextKg = s1kg + increment;
-          rec = `Smashed ${s1reps} reps at ${s1kg} kg. <span class="coach-highlight">Increase to ${nextKg} kg</span> next session, target ${s1min} reps. You have the fuel — push it.`;
-        } else {
-          // Maintain — standard RPT progression (2 weeks rule)
-          if (prevHitTop) {
-            nextKg = s1kg + increment;
-            rec = `Hit ${s1max} reps 2 weeks in a row. <span class="coach-highlight">Increase to ${nextKg} kg</span> next session, target ${s1min} reps.`;
-          } else {
-            rec = `Hit top of range (${s1reps}). Repeat <span class="coach-accent">${s1kg} kg</span> — if you hit ${s1max} again next week, go up to <span class="coach-highlight">${s1kg + increment} kg</span>.`;
-          }
-        }
-      } else if (s1reps >= s1min) {
-        // IN RANGE — push for more reps
-        if (goal === 'cut') {
-          rec = `${s1kg} kg x ${s1reps} — <span class="coach-highlight">solid on a cut</span>. Maintain this weight. Push for ${Math.min(s1reps + 1, s1max)} reps if energy allows.`;
-        } else {
-          rec = `${s1kg} kg x ${s1reps} — in range. <span class="coach-warn">Push for ${Math.min(s1reps + 1, s1max)} reps</span> next time at same weight.`;
-        }
-      } else {
-        // BELOW RANGE
-        if (goal === 'cut') {
-          rec = `${s1reps} reps at ${s1kg} kg — below target (${s1min}-${s1max}). <span class="coach-warn">Normal on a cut.</span> Consider <span class="coach-accent">${s1kg - increment} kg</span> if this persists 2+ weeks.`;
-        } else {
-          rec = `Only ${s1reps} reps at ${s1kg} kg (target ${s1min}+). <span class="coach-warn">Stay at ${s1kg} kg</span> until you hit ${s1min}+ reps.`;
-        }
-      }
-
-      // Build set plan for next session
-      let setPlan = '';
-      for (let s = 1; s <= ex.sets; s++) {
-        const tKg = rptDropWeight(nextKg, s - 1);
-        const tRange = ex.targets[s - 1];
-        setPlan += `<span class="csp-label">S${s}${s===1?' ⚡':''}</span><span class="csp-kg">${tKg} kg</span><span class="csp-reps">${tRange} reps</span>`;
-      }
-
-      recs.push({ name: ex.name, method: 'RPT', rec, setPlan });
+      rows.push(`
+        <div class="coach-ex-row">
+          <div class="coach-ex-top">
+            <div class="coach-ex-name"><span class="method-badge rpt">RPT</span>${ex.name}</div>
+            <span class="coach-directive ${rx.directive}">${dirLabel}</span>
+          </div>
+          ${planHtml}
+        </div>`);
 
     } else if (ex.method === 'kino') {
-      // ── KINO REP LOGIC ────────────────────────────────────
-      // Same weight across all sets. Progress when ALL sets hit top of range.
-      const [minRep, maxRep] = ex.targets[0].split('-').map(Number);
-      let allHitTop = true, anyData = false, kgUsed = 0, lowestReps = Infinity, filledSets = 0;
+      const rx = getKinoPrescription(split, ex);
+      if (!rx) continue;
+      hasAnyData = true;
 
-      for (let s = 1; s <= ex.sets; s++) {
-        const sv = getSet(split, ex.name, currentWeek, s);
-        const kg = parseFloat(sv.kg) || 0;
-        const reps = parseFloat(sv.reps) || 0;
-        if (kg > 0 && reps > 0) {
-          anyData = true; filledSets++;
-          kgUsed = Math.max(kgUsed, kg);
-          lowestReps = Math.min(lowestReps, reps);
-          if (reps < maxRep) allHitTop = false;
-        }
-      }
+      const dirLabel = { hold: 'HOLD', up: `UP → ${rx.nextKg}`, drop: `DROP → ${rx.nextKg}` }[rx.directive];
 
-      const isLeg = split === 'leg';
-      const increment = isLeg ? 5 : 2.5;
-
-      if (!anyData) {
-        // No data — check previous weeks
-        let prevKg = 0;
-        for (let w = currentWeek - 1; w >= 1; w--) {
-          const pv = getSet(split, ex.name, w, 1);
-          if (parseFloat(pv.kg) > 0) { prevKg = parseFloat(pv.kg); break; }
-        }
-        if (prevKg > 0) {
-          recs.push({
-            name: ex.name, method: 'KINO',
-            rec: `Use <span class="coach-accent">${prevKg} kg</span> across all ${ex.sets} sets, aim for ${minRep}-${maxRep} reps.`
-          });
-        }
-        continue;
-      }
-
-      let rec = '';
-      if (allHitTop && filledSets === ex.sets) {
-        if (goal === 'cut') {
-          rec = `All sets at ${maxRep} reps with ${kgUsed} kg — <span class="coach-highlight">great strength retention</span>. Maintain this weight.`;
-        } else if (goal === 'bulk') {
-          const newKg = kgUsed + increment;
-          rec = `Maxed out all ${ex.sets} sets. <span class="coach-highlight">Increase to ${newKg} kg</span> next session, target ${minRep} reps across all sets.`;
-        } else {
-          // Check if hit top 2 weeks running
-          let prevAllHit = true;
-          if (currentWeek > 1) {
-            for (let s = 1; s <= ex.sets; s++) {
-              const pv = getSet(split, ex.name, currentWeek - 1, s);
-              if ((parseFloat(pv.reps) || 0) < maxRep) { prevAllHit = false; break; }
-            }
-          } else { prevAllHit = false; }
-
-          if (prevAllHit) {
-            const newKg = kgUsed + increment;
-            rec = `Hit ${maxRep} reps on all sets 2 weeks running. <span class="coach-highlight">Increase to ${newKg} kg</span>, target ${minRep} reps.`;
-          } else {
-            rec = `All sets at ${maxRep} reps. Repeat <span class="coach-accent">${kgUsed} kg</span> — if you hit ${maxRep} again, go up to ${kgUsed + increment} kg.`;
-          }
-        }
-      } else if (lowestReps >= minRep) {
-        rec = `${kgUsed} kg — lowest set at ${lowestReps} reps. Keep pushing to hit ${maxRep} on <span class="coach-warn">all ${ex.sets} sets</span> before increasing.`;
-      } else {
-        if (goal === 'cut') {
-          rec = `Some sets below ${minRep} reps at ${kgUsed} kg. On a cut, consider <span class="coach-warn">dropping to ${kgUsed - increment} kg</span> to stay in range.`;
-        } else {
-          rec = `Below target range — ${lowestReps} reps at ${kgUsed} kg (need ${minRep}+). <span class="coach-warn">Stay at ${kgUsed} kg</span> until all sets hit ${minRep}+.`;
-        }
-      }
-
-      recs.push({ name: ex.name, method: 'KINO', rec });
+      rows.push(`
+        <div class="coach-ex-row">
+          <div class="coach-ex-top">
+            <div class="coach-ex-name"><span class="method-badge kino">KINO</span>${ex.name}</div>
+            <span class="coach-directive ${rx.directive}">${dirLabel}</span>
+          </div>
+          <div class="coach-plan">
+            <div class="cp-set">All ${rx.sets}</div><div class="cp-kg">${rx.nextKg} kg</div><div class="cp-reps">${rx.reps} reps</div>
+          </div>
+        </div>`);
     }
   }
 
-  // ── Build the coach box HTML ───────────────────────────────
-  if (recs.length === 0 && !warmupHtml) {
+  if (!hasAnyData) {
     box.innerHTML = `
       <div class="coach-box">
         <div class="coach-header">
           <div class="coach-icon">&#9889;</div>
-          <div class="coach-title">Next Session — Greek God RPT</div>
+          <div class="coach-title">Next Session</div>
         </div>
-        <div class="coach-empty">Log your exercises above and I'll generate your next session playbook — when to increase weight, what RPT drop sets to hit, and warmup weights.</div>
+        <div class="coach-empty">Log your sets above and your next session plan will appear here — exact weights and rep targets for every exercise.</div>
       </div>`;
     return;
   }
 
-  // Goal-specific coaching note
-  const goalNotes = {
-    cut: `<strong>CUT MODE</strong> — Strength maintenance is the priority. A 5-10% strength drop is normal in a deficit. Keep protein at 240g+, hit 10,000+ steps/day, and do 1-3 jump rope sessions/week.`,
-    maintain: `<strong>MAINTENANCE</strong> — Standard Greek God RPT progression. Hit the top of your rep range 2 weeks running, then increase weight. Rest 3 min between RPT sets.`,
-    bulk: `<strong>BULK MODE</strong> — Push for PRs. You have the caloric surplus to recover. Increase weight as soon as you hit the top of your rep range. Eat big, lift big.`,
-  };
-
-  let coachHtml = `
+  box.innerHTML = `
     <div class="coach-box">
       <div class="coach-header">
         <div class="coach-icon">&#9889;</div>
-        <div class="coach-title">Next Session — Week ${currentWeek + 1 <= WEEKS ? currentWeek + 1 : currentWeek}</div>
+        <div class="coach-title">Next Session Plan</div>
       </div>
-      <div class="coach-goal-note ${goal}">${goalNotes[goal]}</div>
-      ${warmupHtml}`;
-
-  for (const r of recs) {
-    coachHtml += `
-      <div class="coach-item">
-        <div class="coach-exercise">
-          <span class="method-badge ${r.method === 'RPT' ? 'rpt' : 'kino'}">${r.method}</span>
-          ${r.name}
-        </div>
-        <div class="coach-rec">${r.rec}</div>
-        ${r.setPlan ? `<div class="coach-set-plan">${r.setPlan}</div>` : ''}
-      </div>`;
-  }
-
-  coachHtml += '</div>';
-  box.innerHTML = coachHtml;
+      ${warmupHtml}
+      ${rows.join('')}
+    </div>`;
 }
 
 function render() {
