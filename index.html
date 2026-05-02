@@ -163,6 +163,16 @@ body { overflow-x: hidden; }
 .method-badge.rpt { background: rgba(255,95,0,0.12); color: var(--accent); }
 .method-badge.kino { background: rgba(59,130,246,0.12); color: var(--blue); }
 
+.unit-toggle {
+  padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 800;
+  letter-spacing: 0.1em; flex-shrink: 0; cursor: pointer;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-muted); font-family: var(--font);
+  transition: all 0.15s;
+}
+.unit-toggle:active { transform: scale(0.92); }
+.unit-toggle.lbs { background: rgba(168,85,247,0.12); border-color: rgba(168,85,247,0.25); color: var(--purple); }
+
 .exercise-badge {
   padding: 3px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; white-space: nowrap;
 }
@@ -936,6 +946,43 @@ function setGoal(goal) {
   render();
 }
 
+// ── Unit conversion (KG/LBS) ─────────────────────────────────────────────
+// All weights stored internally in KG. Display unit is per-exercise.
+const LB_PER_KG = 2.20462;
+const KG_PER_LB = 0.453592;
+function kgToLbs(kg) { return Math.round(kg * LB_PER_KG * 2) / 2; }
+function lbsToKg(lbs) { return Math.round(lbs * KG_PER_LB * 2) / 2; }
+
+function getExerciseUnit(split, name) {
+  if (!data.exerciseUnits) data.exerciseUnits = {};
+  return data.exerciseUnits[`${split}|${name}`] || 'kg';
+}
+function setExerciseUnit(split, name, unit) {
+  if (!data.exerciseUnits) data.exerciseUnits = {};
+  data.exerciseUnits[`${split}|${name}`] = unit;
+  saveData();
+}
+function toggleExerciseUnit(split, name) {
+  const cur = getExerciseUnit(split, name);
+  setExerciseUnit(split, name, cur === 'kg' ? 'lbs' : 'kg');
+  renderContent();
+  renderCoach();
+}
+// Storage value (kg) → display value in given unit
+function displayWeight(kgValue, unit) {
+  if (kgValue === '' || kgValue === null || kgValue === undefined) return '';
+  const num = parseFloat(kgValue);
+  if (isNaN(num) || num === 0) return num === 0 ? 0 : '';
+  return unit === 'lbs' ? kgToLbs(num) : num;
+}
+// User input in given unit → kg for storage
+function inputToKg(inputVal, unit) {
+  if (inputVal === '' || inputVal === null || inputVal === undefined) return '';
+  const num = parseFloat(inputVal);
+  if (isNaN(num)) return '';
+  return unit === 'lbs' ? lbsToKg(num) : num;
+}
+
 // Key: split|exercise|week|setNum  -> { kg, reps }
 function getSet(split, name, week, setNum) {
   return data.sets[`${split}|${name}|${week}|${setNum}`] || { kg: '', reps: '' };
@@ -1197,6 +1244,8 @@ function renderExercises(split) {
     // Method info
     const methodLabel = ex.method === 'rpt' ? 'RPT' : 'KINO';
     const methodCls = ex.method;
+    const unit = getExerciseUnit(split, ex.name);
+    const unitLabel = unit.toUpperCase();
 
     // Meta text
     const metaTarget = ex.method === 'rpt'
@@ -1211,6 +1260,7 @@ function renderExercises(split) {
             <div class="exercise-name">
               ${ex.name}
               <span class="method-badge ${methodCls}">${methodLabel}</span>
+              <button class="unit-toggle ${unit}" onclick="event.stopPropagation();toggleExerciseUnit('${split}','${ex.name.replace(/'/g, "\\'")}')">${unitLabel}</button>
             </div>
             <div class="exercise-meta">${ex.sets} sets &middot; ${metaTarget} &middot; ${restTime}</div>
           </div>
@@ -1218,7 +1268,7 @@ function renderExercises(split) {
         </div>
         <div class="sets-container">
           <div class="set-header">
-            <span>Set</span><span>KG</span><span>Reps</span>
+            <span>Set</span><span>${unitLabel}</span><span>Reps</span>
           </div>`;
 
     for (let s = 1; s <= ex.sets; s++) {
@@ -1227,9 +1277,14 @@ function renderExercises(split) {
       const kgFilled = sv.kg ? 'filled' : '';
       const repsFilled = sv.reps ? 'filled' : '';
 
-      // Smart placeholder for kg
-      const kgPlaceholder = getSmartPlaceholder(split, ex, s);
+      // Smart placeholder for kg (in storage units), then convert to display unit
+      const phKg = getSmartPlaceholder(split, ex, s);
+      const kgPlaceholder = (typeof phKg === 'number' || (typeof phKg === 'string' && phKg !== '—'))
+        ? displayWeight(phKg, unit) : '—';
       const repsPlaceholder = prevSv.reps || '—';
+
+      // Display value: convert kg-stored to current display unit
+      const displayedVal = sv.kg !== '' ? displayWeight(sv.kg, unit) : '';
 
       // Set label with target
       const setTarget = ex.targets[s - 1] || '';
@@ -1242,8 +1297,8 @@ function renderExercises(split) {
               <span class="set-target-hint">${setTarget}</span>
             </div>
             <input class="set-input ${kgFilled}" type="number" inputmode="decimal" placeholder="${kgPlaceholder}"
-              value="${sv.kg}"
-              onchange="setSetVal('${split}','${ex.name}',${currentWeek},${s},'kg',this.value);renderContent()"
+              value="${displayedVal}"
+              onchange="setSetVal('${split}','${ex.name}',${currentWeek},${s},'kg',inputToKg(this.value,'${unit}'));renderContent()"
               onfocus="this.select()">
             <input class="set-input ${repsFilled}" type="number" inputmode="numeric" placeholder="${repsPlaceholder}"
               value="${sv.reps}"
@@ -1599,28 +1654,33 @@ function renderCoach() {
   let hasAnyData = false;
 
   for (const ex of exercises) {
+    const unit = getExerciseUnit(split, ex.name);
+    const unitLabel = unit.toUpperCase();
+
     if (ex.method === 'rpt') {
       const rx = getRptPrescription(split, ex);
       if (!rx) continue;
       hasAnyData = true;
 
-      // Warmup for first RPT exercise only
+      // Warmup for first RPT exercise only — display in that exercise's unit
       if (!warmupHtml) {
         const wkg = rx.plan[0].kg;
-        const w60 = Math.round(wkg * 0.6 * 2) / 2;
-        const w75 = Math.round(wkg * 0.75 * 2) / 2;
-        const w90 = Math.round(wkg * 0.9 * 2) / 2;
-        warmupHtml = `<div class="coach-warmup"><strong>Warmup</strong> &nbsp; <span class="wu">${w60}</span> x5 &rarr; <span class="wu">${w75}</span> x3 &rarr; <span class="wu">${w90}</span> x1 &rarr; rest 3 min</div>`;
+        const w60 = displayWeight(Math.round(wkg * 0.6 * 2) / 2, unit);
+        const w75 = displayWeight(Math.round(wkg * 0.75 * 2) / 2, unit);
+        const w90 = displayWeight(Math.round(wkg * 0.9 * 2) / 2, unit);
+        warmupHtml = `<div class="coach-warmup"><strong>Warmup</strong> &nbsp; <span class="wu">${w60} ${unitLabel}</span> x5 &rarr; <span class="wu">${w75} ${unitLabel}</span> x3 &rarr; <span class="wu">${w90} ${unitLabel}</span> x1 &rarr; rest 3 min</div>`;
       }
 
-      // Build set plan grid
+      // Build set plan grid (display in exercise's unit)
       let planHtml = '<div class="coach-plan">';
       for (const p of rx.plan) {
-        planHtml += `<div class="cp-set ${p.set === 1 ? 'heavy' : ''}">S${p.set}${p.set === 1 ? ' ⚡' : ''}</div><div class="cp-kg">${p.kg} kg</div><div class="cp-reps">${p.reps} reps</div>`;
+        const dispKg = displayWeight(p.kg, unit);
+        planHtml += `<div class="cp-set ${p.set === 1 ? 'heavy' : ''}">S${p.set}${p.set === 1 ? ' ⚡' : ''}</div><div class="cp-kg">${dispKg} ${unitLabel}</div><div class="cp-reps">${p.reps} reps</div>`;
       }
       planHtml += '</div>';
 
-      const dirLabel = { hold: 'HOLD', up: `UP → ${rx.nextKg}`, drop: `DROP → ${rx.nextKg}` }[rx.directive];
+      const nextDisp = displayWeight(rx.nextKg, unit);
+      const dirLabel = { hold: 'HOLD', up: `UP → ${nextDisp}`, drop: `DROP → ${nextDisp}` }[rx.directive];
 
       rows.push(`
         <div class="coach-ex-row">
@@ -1636,7 +1696,8 @@ function renderCoach() {
       if (!rx) continue;
       hasAnyData = true;
 
-      const dirLabel = { hold: 'HOLD', up: `UP → ${rx.nextKg}`, drop: `DROP → ${rx.nextKg}` }[rx.directive];
+      const nextDisp = displayWeight(rx.nextKg, unit);
+      const dirLabel = { hold: 'HOLD', up: `UP → ${nextDisp}`, drop: `DROP → ${nextDisp}` }[rx.directive];
 
       rows.push(`
         <div class="coach-ex-row">
@@ -1645,7 +1706,7 @@ function renderCoach() {
             <span class="coach-directive ${rx.directive}">${dirLabel}</span>
           </div>
           <div class="coach-plan">
-            <div class="cp-set">All ${rx.sets}</div><div class="cp-kg">${rx.nextKg} kg</div><div class="cp-reps">${rx.reps} reps</div>
+            <div class="cp-set">All ${rx.sets}</div><div class="cp-kg">${nextDisp} ${unitLabel}</div><div class="cp-reps">${rx.reps} reps</div>
           </div>
         </div>`);
     }
