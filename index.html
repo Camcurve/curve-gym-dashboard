@@ -6,6 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#131313">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Gym Tracker — Curve</title>
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@300,400,500,700,800&display=swap" rel="stylesheet">
@@ -376,9 +379,106 @@ body { overflow-x: hidden; }
 .coach-plan .cp-kg { color: var(--text); font-weight: 600; padding: 3px 0; }
 .coach-plan .cp-reps { color: var(--text-muted); font-weight: 500; text-align: right; padding: 3px 0; }
 
+/* ── Sync ──────────────────────────────────────────────────────── */
+.btn-icon.synced { color: var(--green); border-color: rgba(34,197,94,0.25); }
+.btn-icon.syncing { color: var(--accent); }
+.btn-icon.unsynced { color: var(--yellow); border-color: rgba(234,179,8,0.25); }
+.btn-icon .sync-dot {
+  position: absolute; top: 6px; right: 6px; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--yellow);
+}
+
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+  z-index: 100; display: flex; align-items: flex-end; justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  background: var(--surface); border-top: 1px solid var(--border);
+  border-radius: 18px 18px 0 0; width: 100%; max-width: 520px;
+  padding: 20px 18px calc(24px + var(--safe-bottom));
+  max-height: 90vh; overflow-y: auto;
+  animation: slideUp 0.25s cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-handle {
+  width: 36px; height: 4px; background: rgba(255,255,255,0.15);
+  border-radius: 2px; margin: 0 auto 16px;
+}
+.modal-title {
+  font-size: 18px; font-weight: 700; letter-spacing: -0.01em;
+  margin-bottom: 6px;
+}
+.modal-subtitle {
+  font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 18px;
+}
+.modal-section { margin-bottom: 16px; }
+.modal-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;
+}
+.modal-input {
+  width: 100%; padding: 12px 14px; border-radius: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text); font-family: 'SF Mono', Menlo, monospace;
+  font-size: 13px; outline: none;
+}
+.modal-input:focus { border-color: rgba(255,95,0,0.5); background: rgba(255,95,0,0.05); }
+.modal-btn {
+  width: 100%; padding: 14px; border-radius: 10px; border: none;
+  font-family: var(--font); font-size: 14px; font-weight: 700;
+  letter-spacing: 0.04em; cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.modal-btn:active { transform: scale(0.98); }
+.modal-btn-primary { background: var(--accent); color: #fff; }
+.modal-btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); margin-top: 8px; }
+.modal-btn-danger { background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.25); margin-top: 8px; }
+
+.modal-step {
+  display: flex; align-items: flex-start; gap: 10px; padding: 8px 0;
+  font-size: 13px; line-height: 1.5;
+}
+.modal-step-num {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(255,95,0,0.12); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800;
+}
+.modal-step a { color: var(--accent); font-weight: 600; text-decoration: none; }
+
+.sync-status {
+  padding: 10px 12px; border-radius: 8px; margin-bottom: 16px;
+  background: rgba(34,197,94,0.06); border: 1px solid rgba(34,197,94,0.2);
+  font-size: 12px; line-height: 1.5;
+}
+.sync-status .sync-status-label { color: var(--green); font-weight: 700; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+.sync-status.error { background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.2); }
+.sync-status.error .sync-status-label { color: var(--red); }
+
+.sync-banner {
+  background: rgba(234,179,8,0.06); border: 1px solid rgba(234,179,8,0.2);
+  border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 12px;
+  cursor: pointer; transition: all 0.2s;
+}
+.sync-banner:active { transform: scale(0.99); }
+.sync-banner-icon {
+  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+  background: rgba(234,179,8,0.12); color: var(--yellow);
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.sync-banner-text { flex: 1; }
+.sync-banner-title { font-size: 12px; font-weight: 700; color: var(--yellow); margin-bottom: 2px; }
+.sync-banner-sub { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+.sync-banner-arrow { color: var(--text-muted); }
+
 /* ── Animations ────────────────────────────────────────────────── */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .fade-up { animation: fadeUp 0.4s ease forwards; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }
 
 /* ── Desktop ───────────────────────────────────────────────────── */
 @media (min-width: 768px) {
@@ -411,6 +511,7 @@ body { overflow-x: hidden; }
       <span class="logo-sub">Gym Tracker</span>
     </div>
     <div class="header-actions">
+      <button class="btn-icon" id="syncBtn" onclick="openSyncModal()" title="Sync">&#9729;</button>
       <button class="btn-icon" onclick="exportData()" title="Export">&#8595;</button>
       <button class="btn-icon" onclick="importData()" title="Import">&#8593;</button>
     </div>
@@ -419,6 +520,7 @@ body { overflow-x: hidden; }
   <div class="goal-bar" id="goalBar"></div>
 
   <main class="main">
+    <div id="syncBanner"></div>
     <div class="tabs-desktop" id="tabsDesktop"></div>
     <div class="stats-row fade-up" id="statsRow"></div>
     <div class="week-scroll" id="weekScroll"></div>
@@ -435,6 +537,8 @@ body { overflow-x: hidden; }
   </main>
 
   <nav class="bottom-nav" id="bottomNav"></nav>
+
+  <div id="syncModal"></div>
 </div>
 
 <script>
@@ -559,7 +663,272 @@ function loadData() {
   if (saved) return JSON.parse(saved);
   return { sets: {}, nutrition: {} };
 }
-function saveData() { localStorage.setItem('curveGymDataV2', JSON.stringify(data)); }
+function saveData() {
+  localStorage.setItem('curveGymDataV2', JSON.stringify(data));
+  scheduleSyncPush();
+}
+
+// ── Cloud Sync (GitHub Gist) ──────────────────────────────────────────────
+let syncConfig = JSON.parse(localStorage.getItem('curveGymSync') || 'null');
+let syncStatus = 'idle'; // idle | syncing | synced | error | unconfigured
+let syncError = '';
+let syncPushTimer = null;
+const GIST_FILENAME = 'curve-gym-data.json';
+const GIST_DESCRIPTION = 'Curve Gym Dashboard — workout data';
+
+function isSyncConfigured() { return syncConfig && syncConfig.token && syncConfig.gistId; }
+
+function scheduleSyncPush() {
+  if (!isSyncConfigured()) return;
+  clearTimeout(syncPushTimer);
+  syncPushTimer = setTimeout(syncPush, 1500);
+}
+
+async function syncPush() {
+  if (!isSyncConfigured()) return;
+  syncStatus = 'syncing'; renderSyncBtn();
+  try {
+    const resp = await fetch(`https://api.github.com/gists/${syncConfig.gistId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `token ${syncConfig.token}`,
+        'Accept': 'application/vnd.github+json',
+      },
+      body: JSON.stringify({
+        files: { [GIST_FILENAME]: { content: JSON.stringify({ data, goal: currentGoal, savedAt: new Date().toISOString() }, null, 2) } }
+      })
+    });
+    if (!resp.ok) throw new Error(`Push failed: ${resp.status}`);
+    syncConfig.lastSync = new Date().toISOString();
+    localStorage.setItem('curveGymSync', JSON.stringify(syncConfig));
+    syncStatus = 'synced';
+  } catch (e) {
+    syncStatus = 'error'; syncError = e.message;
+  }
+  renderSyncBtn();
+}
+
+async function syncPull() {
+  if (!isSyncConfigured()) return false;
+  syncStatus = 'syncing'; renderSyncBtn();
+  try {
+    const resp = await fetch(`https://api.github.com/gists/${syncConfig.gistId}`, {
+      headers: { 'Authorization': `token ${syncConfig.token}`, 'Accept': 'application/vnd.github+json' }
+    });
+    if (!resp.ok) throw new Error(`Pull failed: ${resp.status}`);
+    const gist = await resp.json();
+    const file = gist.files[GIST_FILENAME];
+    if (file && file.content) {
+      const parsed = JSON.parse(file.content);
+      if (parsed.data) {
+        data = parsed.data;
+        if (parsed.goal) { currentGoal = parsed.goal; localStorage.setItem('curveGymGoal', currentGoal); }
+        localStorage.setItem('curveGymDataV2', JSON.stringify(data));
+      }
+    }
+    syncConfig.lastSync = new Date().toISOString();
+    localStorage.setItem('curveGymSync', JSON.stringify(syncConfig));
+    syncStatus = 'synced';
+    renderSyncBtn();
+    return true;
+  } catch (e) {
+    syncStatus = 'error'; syncError = e.message;
+    renderSyncBtn();
+    return false;
+  }
+}
+
+async function syncSetup(token) {
+  if (!token || !token.trim()) throw new Error('Token is required');
+  token = token.trim();
+  const headers = { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github+json' };
+
+  // Validate token by hitting /user
+  const userResp = await fetch('https://api.github.com/user', { headers });
+  if (!userResp.ok) throw new Error('Invalid token. Make sure it has the "gist" scope.');
+  const user = await userResp.json();
+
+  // Search existing gists for our gym data
+  let page = 1, found = null;
+  while (page <= 5 && !found) {
+    const gistsResp = await fetch(`https://api.github.com/gists?per_page=100&page=${page}`, { headers });
+    if (!gistsResp.ok) throw new Error('Failed to list gists');
+    const gists = await gistsResp.json();
+    if (gists.length === 0) break;
+    found = gists.find(g => g.description === GIST_DESCRIPTION || (g.files && g.files[GIST_FILENAME]));
+    page++;
+  }
+
+  let gistId, isNew = false;
+  if (found) {
+    gistId = found.id;
+  } else {
+    // Create new gist
+    const createResp = await fetch('https://api.github.com/gists', {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        description: GIST_DESCRIPTION,
+        public: false,
+        files: { [GIST_FILENAME]: { content: JSON.stringify({ data, goal: currentGoal, savedAt: new Date().toISOString() }, null, 2) } }
+      })
+    });
+    if (!createResp.ok) throw new Error('Failed to create gist');
+    const newGist = await createResp.json();
+    gistId = newGist.id;
+    isNew = true;
+  }
+
+  syncConfig = { token, gistId, user: user.login, lastSync: new Date().toISOString() };
+  localStorage.setItem('curveGymSync', JSON.stringify(syncConfig));
+
+  // If found existing gist, pull data; otherwise we just pushed local data
+  if (!isNew) await syncPull();
+
+  syncStatus = 'synced';
+  return { user: user.login, isNew };
+}
+
+function syncDisconnect() {
+  syncConfig = null;
+  syncStatus = 'unconfigured';
+  localStorage.removeItem('curveGymSync');
+  renderSyncBtn();
+  renderSyncBanner();
+  closeSyncModal();
+}
+
+function renderSyncBtn() {
+  const btn = document.getElementById('syncBtn');
+  if (!btn) return;
+  btn.classList.remove('synced', 'syncing', 'unsynced');
+  if (!isSyncConfigured()) {
+    btn.classList.add('unsynced');
+    btn.innerHTML = '&#9729;<span class="sync-dot"></span>';
+  } else if (syncStatus === 'syncing') {
+    btn.classList.add('syncing');
+    btn.innerHTML = '<span class="spin" style="display:inline-block">&#8635;</span>';
+  } else if (syncStatus === 'error') {
+    btn.classList.add('unsynced');
+    btn.innerHTML = '&#9888;';
+  } else {
+    btn.classList.add('synced');
+    btn.innerHTML = '&#9729;';
+  }
+}
+
+function renderSyncBanner() {
+  const el = document.getElementById('syncBanner');
+  if (!el) return;
+  if (isSyncConfigured()) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="sync-banner" onclick="openSyncModal()">
+      <div class="sync-banner-icon">&#9888;</div>
+      <div class="sync-banner-text">
+        <div class="sync-banner-title">Set up cloud sync</div>
+        <div class="sync-banner-sub">Your data is only on this device. Tap to back it up to GitHub and access from any device.</div>
+      </div>
+      <div class="sync-banner-arrow">&rsaquo;</div>
+    </div>`;
+}
+
+function timeAgo(isoStr) {
+  if (!isoStr) return 'never';
+  const diff = (Date.now() - new Date(isoStr).getTime()) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
+}
+
+function openSyncModal() {
+  const m = document.getElementById('syncModal');
+  if (isSyncConfigured()) {
+    // Already configured - show status + disconnect
+    const errorBlock = syncStatus === 'error'
+      ? `<div class="sync-status error"><div class="sync-status-label">Last sync error</div><div>${syncError || 'Unknown error'}</div></div>`
+      : '';
+    m.innerHTML = `
+      <div class="modal-backdrop" onclick="if(event.target===this)closeSyncModal()">
+        <div class="modal">
+          <div class="modal-handle"></div>
+          <div class="modal-title">Cloud Sync</div>
+          <div class="modal-subtitle">Your data is backing up to a private GitHub gist on your account.</div>
+          ${errorBlock}
+          <div class="sync-status">
+            <div class="sync-status-label">Connected</div>
+            <div style="margin-top:4px;font-size:13px;color:var(--text)"><strong>${syncConfig.user || 'GitHub user'}</strong></div>
+            <div style="margin-top:2px;color:var(--text-muted)">Last sync: ${timeAgo(syncConfig.lastSync)}</div>
+          </div>
+          <button class="modal-btn modal-btn-primary" onclick="manualSync()">&#8634;&nbsp; Sync Now</button>
+          <button class="modal-btn modal-btn-secondary" onclick="closeSyncModal()">Close</button>
+          <button class="modal-btn modal-btn-danger" onclick="if(confirm('Disconnect sync? Your local data will remain.'))syncDisconnect()">Disconnect</button>
+        </div>
+      </div>`;
+  } else {
+    m.innerHTML = `
+      <div class="modal-backdrop" onclick="if(event.target===this)closeSyncModal()">
+        <div class="modal">
+          <div class="modal-handle"></div>
+          <div class="modal-title">Set up cloud sync</div>
+          <div class="modal-subtitle">Sync your gym data across all your devices using a private gist on your GitHub account. Free, secure, and your data stays in your control.</div>
+
+          <div class="modal-section">
+            <div class="modal-step">
+              <div class="modal-step-num">1</div>
+              <div><a href="https://github.com/settings/tokens/new?scopes=gist&description=Curve+Gym+Dashboard" target="_blank" rel="noopener">Open GitHub &rarr;</a> and click <strong>"Generate token"</strong> at the bottom (the gist scope is pre-selected).</div>
+            </div>
+            <div class="modal-step">
+              <div class="modal-step-num">2</div>
+              <div>Copy the new token (it starts with <code style="font-size:11px;background:rgba(255,255,255,0.05);padding:1px 5px;border-radius:3px">ghp_</code>).</div>
+            </div>
+            <div class="modal-step">
+              <div class="modal-step-num">3</div>
+              <div>Paste it below. We'll create a private gist or find your existing one.</div>
+            </div>
+          </div>
+
+          <div class="modal-section">
+            <div class="modal-label">GitHub Personal Access Token</div>
+            <input type="password" id="syncTokenInput" class="modal-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+            <div id="syncSetupError" style="font-size:11px;color:var(--red);margin-top:8px;min-height:14px"></div>
+          </div>
+
+          <button class="modal-btn modal-btn-primary" id="syncConnectBtn" onclick="handleSyncConnect()">Connect</button>
+          <button class="modal-btn modal-btn-secondary" onclick="closeSyncModal()">Cancel</button>
+        </div>
+      </div>`;
+  }
+}
+
+function closeSyncModal() {
+  document.getElementById('syncModal').innerHTML = '';
+}
+
+async function handleSyncConnect() {
+  const tokenInput = document.getElementById('syncTokenInput');
+  const errEl = document.getElementById('syncSetupError');
+  const btn = document.getElementById('syncConnectBtn');
+  errEl.textContent = '';
+  btn.disabled = true; btn.textContent = 'Connecting...';
+  try {
+    const result = await syncSetup(tokenInput.value);
+    closeSyncModal();
+    renderSyncBtn();
+    renderSyncBanner();
+    render();
+  } catch (e) {
+    errEl.textContent = e.message;
+    btn.disabled = false; btn.textContent = 'Connect';
+  }
+}
+
+async function manualSync() {
+  syncStatus = 'syncing'; renderSyncBtn();
+  await syncPush();
+  await syncPull();
+  render();
+  openSyncModal(); // refresh modal state
+}
 
 function setGoal(goal) {
   currentGoal = goal;
@@ -1308,6 +1677,7 @@ function renderCoach() {
 function render() {
   renderGoalBar(); renderBottomNav(); renderDesktopTabs(); renderWeekScroll();
   renderStats(); renderContent(); renderChart(); renderCoach();
+  renderSyncBtn(); renderSyncBanner();
 }
 
 function exportData() {
@@ -1335,6 +1705,24 @@ currentWeek = Math.max(1, ...Array.from(getFilledWeeks()));
 if (!getFilledWeeks().size) currentWeek = 1;
 render();
 window.addEventListener('resize', renderChart);
+
+// Auto-pull from cloud on app load if sync is configured
+(async function initSync() {
+  if (isSyncConfigured()) {
+    const ok = await syncPull();
+    if (ok) {
+      currentWeek = Math.max(1, ...Array.from(getFilledWeeks()));
+      if (!getFilledWeeks().size) currentWeek = 1;
+      render();
+    }
+  } else {
+    syncStatus = 'unconfigured';
+    renderSyncBtn();
+  }
+})();
+
+// Push any pending changes when coming back online
+window.addEventListener('online', () => { if (isSyncConfigured()) syncPush(); });
 </script>
 </body>
 </html>
